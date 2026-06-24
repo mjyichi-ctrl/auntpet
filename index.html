@@ -632,9 +632,16 @@ async function openPet(id){
       ${future&&future.length?`<div class="plan" style="background:rgba(255,199,44,.12)"><b>📅 未來預約</b>${future.map(f=>`<br>${showDateShort(f.start_time)} ${showTime(f.start_time)} ${f.service_note||''}`).join('')}</div>`:''}
       <button class="btn btn-g" style="margin-top:10px" onclick='checkout(${JSON.stringify({id:future&&future[0]?future[0].id:null,pets:p}).replace(/'/g,"&#39;")})'>＋ 登記今日服務</button></div>
     <h3 class="sec">歷史紀錄（${recs?.length||0}）</h3>
-    <div class="card">${(recs||[]).map(r=>`<div class="history-item"><span class="hd">${r.service_date}</span>　${typeText[r.service_type]||r.service_type}${r.monthly_seq?'('+r.monthly_seq+')':''}　$${r.amount||0}${r.addons?' '+r.addons:''}</div>`).join('')||'<p class="center">無紀錄</p>'}</div>`;
+<div class="card">${(recs||[]).map(r=>`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center"><div><span class="hd">${r.service_date}</span>　${typeText[r.service_type]||r.service_type}${r.monthly_seq?'('+r.monthly_seq+')':''}　$${r.amount||0}${r.addons?' '+r.addons:''}</div><button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`).join('')||'<p class="center">無紀錄</p>'}</div>`;
 }
-async function editPet(id){
+async function delServiceRecord(srId, petId){
+  if(!confirm('確定刪除這筆服務紀錄？對應的帳本收入也會一起刪除喔')) return;
+  await sb.from('transactions').delete().eq('service_record_id', srId);
+  await sb.from('service_records').delete().eq('id', srId);
+  alert('已刪除');
+  openPet(petId);
+}
+  async function editPet(id){
   go('edit');const {data:p}=await sb.from('pets').select('*,customers(id,phone)').eq('id',id).single();
   document.getElementById('tab-edit').innerHTML=`<h3 class="sec">編輯資料</h3>
     <div class="card"><label class="lbl">寵物名</label><input class="fld" id="eName" value="${p.name||''}">
