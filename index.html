@@ -68,17 +68,13 @@ label.lbl{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
 .wtable th.today{background:var(--lemon);color:#5A4400;border-radius:6px}
 .wtable td{height:26px;cursor:pointer}
 .wtable td.biz{background:rgba(255,199,44,.10)}
-.wtable td.timecol{background:#FAFBFD;color:var(--muted);font-weight:bold;min-width:40px;cursor:default}
 .wtable td.half{border-top:1px dashed var(--line)}
 .wtable td.hourline{border-top:2px solid rgba(20,30,50,.22)}
 .wtable td.daycell{position:relative}
 .wtable td.daycell .wm{position:absolute;top:1px;left:3px;font-size:9px;color:rgba(20,30,50,.18);font-weight:bold;pointer-events:none;z-index:0}
-.wtable td.daycell .appt-chip{position:relative;z-index:1}
-.wtable td.timecol{display:none}
-.wtable th.timecol{display:none}
+.wtable td.timecol,.wtable th.timecol{display:none}
+.appt-chip{background:linear-gradient(135deg,#FFD556,#FFC72C);color:#5A4400;border-radius:6px;font-size:10px;padding:0 4px;display:block;line-height:1.5;height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold;box-shadow:0 1px 3px rgba(255,199,44,.4);margin-bottom:1px;position:relative;z-index:1}
 .appt-chip.done{background:#C8CDD6;color:#5A6472;text-decoration:line-through;opacity:.75}
-.appt-chip .ct{font-weight:bold;margin-right:2px}
-.appt-chip{background:linear-gradient(135deg,#FFD556,#FFC72C);color:#5A4400;border-radius:6px;font-size:10px;padding:0 4px;display:block;line-height:1.5;height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold;box-shadow:0 1px 3px rgba(255,199,44,.4);margin-bottom:1px}
 .zoombtns{display:flex;gap:8px;justify-content:center;margin:10px 0}
 .zoombtns button{width:44px;height:38px;border:1px solid var(--card-border);background:#fff;color:var(--lemon-soft);border-radius:10px;font-size:18px;font-weight:bold;cursor:pointer}
 .calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -228,10 +224,12 @@ label.lbl{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
   <div class="nav"><div class="nav-inner">
     <div id="nav-home" class="on" onclick="go('home',this)"><span class="ic">🏠</span>今日</div>
     <div id="nav-week" onclick="go('week',this);loadWeek()"><span class="ic">📅</span>週曆</div>
+    <div id="nav-search" onclick="go('search',this);focusSearch()"><span class="ic">🔍</span>搜尋</div>
     <div id="nav-ledger" onclick="go('ledger',this);loadLedger()"><span class="ic">📒</span>帳本</div>
     <div id="nav-report" onclick="go('report',this);loadReport()"><span class="ic">📊</span>報表</div>
     <div onclick="logout()"><span class="ic">🚪</span>登出</div>
   </div></div>
+
   </div>
 </div>
 <div id="modalRoot"></div>
@@ -688,6 +686,7 @@ async function saveAppt(){
 }
 
 let sTimer;
+function focusSearch(){setTimeout(()=>{const el=document.getElementById('searchInput');if(el)el.focus();},100);}
 function doSearch(){clearTimeout(sTimer);sTimer=setTimeout(async()=>{const q=document.getElementById('searchInput').value;if(!q){document.getElementById('searchList').innerHTML='';return}
   const {data}=await sb.from('pets').select('*,customers(phone)').or(`name.ilike.%${q}%,breed.ilike.%${q}%`).limit(20);let extra=[];
   if(/^\d+$/.test(q)){const {data:byPhone}=await sb.from('customers').select('id,phone,pets(*)').ilike('phone',`%${q}%`).limit(10);(byPhone||[]).forEach(c=>(c.pets||[]).forEach(p=>extra.push({...p,customers:{phone:c.phone}})));}
