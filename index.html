@@ -266,7 +266,7 @@ async function loadHome(){
   // 抓所有「未完成」的預約（不限今天），依時間排序
   const {data:appts}=await sb.from('appointments')
     .select('*,pets(id,name,breed,notes,price_wash,price_full,price_monthly)')
-    .neq('status','done')
+    .or('status.is.null,status.neq.done')
     .order('start_time');
   const list=document.getElementById('todayList');
   if(!appts||!appts.length){list.innerHTML='<p class="center">目前沒有未完成的預約 🎉</p>';}
