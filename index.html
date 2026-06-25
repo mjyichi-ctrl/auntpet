@@ -693,11 +693,18 @@ async function openPet(id){
       <p style="color:var(--muted);font-size:13px;margin-top:4px">📞 ${p.customers?.phone||'—'}</p>
       ${p.notes?`<p class="warn">⚠ ${p.notes}</p>`:''}
       <p style="font-size:13px;margin-top:6px">洗 $${p.price_wash||0}　大美 $${p.price_full||0}　包月 $${p.price_monthly||0}</p>
-      ${plan?`<div class="plan"><b>🎫 ${plan.plan_name||'包月卡'}</b><br>剩 <b>${(plan.total_count||0)-(plan.used_count||0)}</b> 次（已用 ${plan.used_count||0}/${plan.total_count||0}）　已用 ${plan.used_points||0} 點<br>均價 $${plan.used_points>0?Math.round((plan.amount||0)/plan.used_points):'—'}/點　${plan.expire_date?'到期 '+plan.expire_date:'尚未啟用'}</div>`:''}
+      ${plan?`<div class="plan"><b>🎫 ${plan.plan_name||'包月卡'}</b><br>剩 <b>${(plan.total_count||0)-(plan.used_count||0)}</b> 次（已用 ${plan.used_count||0}/${plan.total_count||0}）　已用 ${plan.used_points||0} 點<br>每點 $${plan.total_points>0?Math.round((plan.amount||0)/plan.total_points):'—'}（洗1點/大美2點）
+　${plan.expire_date?'到期 '+plan.expire_date:'尚未啟用'}</div>`:''}
       ${future&&future.length?`<div class="plan" style="background:rgba(255,199,44,.12)"><b>📅 未來預約</b>${future.map(f=>`<br>${showDateShort(f.start_time)} ${showTime(f.start_time)} ${f.service_note||''}`).join('')}</div>`:''}
       <button class="btn btn-g" style="margin-top:10px" onclick='checkout(${JSON.stringify({id:future&&future[0]?future[0].id:null,pets:p}).replace(/'/g,"&#39;")})'>＋ 登記今日服務</button><button class="btn btn-b" style="margin-top:8px" onclick='openNewPlan(${JSON.stringify({id:p.id,name:p.name}).replace(/'/g,"&#39;")})'>🎫 開包月卡</button></div>
     <h3 class="sec">歷史紀錄（${recs?.length||0}）</h3>
-<div class="card">${(recs||[]).map(r=>`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center"><div><span class="hd">${r.service_date}</span>　${typeText[r.service_type]||r.service_type}${r.monthly_seq?'('+r.monthly_seq+')':''}　$${r.amount||0}${r.addons?' '+r.addons:''}</div><button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`).join('')||'<p class="center">無紀錄</p>'}</div>`;
+<div class="card">${(recs||[]).map(r=>{
+  const isPlan=r.monthly_seq||r.amount===0;
+  const pts=(r.service_type==='full')?2:1;
+  const amtShow=isPlan?`🎫扣${pts}點`:('$'+(r.amount||0));
+  return `<div class="history-item" style="display:flex;justify-content:space-between;align-items:center"><div><span class="hd">${r.service_date}</span>　${typeText[r.service_type]||r.service_type}${r.monthly_seq?'(第'+r.monthly_seq+'次)':''}　${amtShow}${r.addons?' '+r.addons:''}</div><button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`;
+}).join('')||'<p class="center">無紀錄</p>'}</div>
+<button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`).join('')||'<p class="center">無紀錄</p>'}</div>`;
 }
   
 const PLAN_PRESETS=[
