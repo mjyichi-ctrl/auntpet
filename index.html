@@ -348,7 +348,7 @@ async function saveCheckout(o){
   if(type==='monthly'){const {data:pl}=await sb.from('plans').select('*').eq('pet_id',o.petId).eq('is_active',true).limit(1);
     if(pl&&pl.length){const cur=pl[0];const used=(cur.used_count||0)+1;await sb.from('plans').update({used_count:used,is_active:used<(cur.total_count||0)}).eq('id',cur.id);}}
   // 4) 預約標記完成
-  if(o.apptId)await sb.from('appointments').update({status:'done',paid_amount:amount}).eq('id',o.apptId);
+  if(o.apptId)await sb.from('appointments').update({status:'done'}).eq('id',o.apptId);
   alert('✅ 結帳完成！收款 $'+amount+'（'+coPay+'）');loadHome();
 }
 
