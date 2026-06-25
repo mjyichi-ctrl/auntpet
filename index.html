@@ -463,7 +463,10 @@ async function loadLedger(){
   await loadAccounts();
   const sel=document.getElementById('ledgerAcct');
   sel.innerHTML='<option value="">全部帳戶</option>'+ACCOUNTS.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
-  const {data}=await sb.from('transactions').select('*').order('txn_date',{ascending:false});
+  // 用關聯一次帶出寵物名字與 pet_id（service_records → pets）
+  const {data}=await sb.from('transactions')
+    .select('*,service_records(pet_id,pets(id,name,breed))')
+    .order('txn_date',{ascending:false});
   ALLTXN=data||[];
   renderBalances();renderLedger();
 }
@@ -505,12 +508,16 @@ function renderLedger(){
       if(t.txn_type==='income')din+=amt;else if(t.txn_type==='expense'||t.txn_type==='salary')dout+=Math.abs(amt);
       const acc=t.txn_type==='transfer'&&t.to_account_id?`${acctName(t.account_id)}→${acctName(t.to_account_id)}`:acctName(t.account_id);
       const amtCls=amt>=0?'pos':'neg';
+            const pet=t.service_records&&t.service_records.pets?t.service_records.pets:null;
+      const petTag=pet?` <span style="color:var(--blue);font-weight:bold">🐾${pet.name}</span>`:'';
+      const petBtn=pet?`<button onclick="openPet('${pet.id}')" title="看客人">👤</button>`:'';
       return `<div class="led-row"><div class="li">
-        <div class="lt">${t.category||t.note||'—'}<span class="tag ${tg[1]}">${tg[0]}</span></div>
+        <div class="lt">${t.category||t.note||'—'}${petTag}<span class="tag ${tg[1]}">${tg[0]}</span></div>
         <div class="lm">${acc||''}${t.note&&t.category?(' · '+t.note):''}</div></div>
         <div class="led-amt ${amtCls}">${amt>=0?'+':''}${amt.toLocaleString()}</div>
-        <div class="led-acts"><button onclick='editTxn(${JSON.stringify(t).replace(/'/g,"&#39;")})'>✏️</button><button onclick="delTxn('${t.id}')">🗑</button></div>
+        <div class="led-acts">${petBtn}<button onclick='editTxn(${JSON.stringify(t).replace(/'/g,"&#39;")})'>✏️</button><button onclick="delTxn('${t.id}')">🗑</button></div>
       </div>`;
+
     }).join('');
     html+=`<div class="led-day"><div class="dhead"><span>${d}</span><span>收 +${din.toLocaleString()}　支 -${dout.toLocaleString()}</span></div>${items}</div>`;
   });
