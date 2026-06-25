@@ -281,16 +281,32 @@ async function loadHome(){
 
 const ADDON_PRESETS=['拆結費','梳理廢毛','冰河泥','深層潤絲','SPA','清耳朵','拔耳毛','剪磨指甲','貴賓腳'];
 let coAddons=[]; // [{name, amount}]
-function checkout(a){
+async function checkout(a){
   const p=a.pets||{};coAddons=[];go('service');
+  // 先抓有效包月卡
+  let planInfo='';
+  if(p.id){
+    const {data:pl}=await sb.from('plans').select('*').eq('pet_id',p.id).eq('is_active',true).order('created_at').limit(1);
+    if(pl&&pl.length){
+      const c=pl[0];const left=(c.total_count||0)-(c.used_count||0);
+      if(left>0){
+        planInfo=`<div class="plan" style="background:rgba(34,164,93,.12)">
+          🎫 <b>${c.plan_name||'包月卡'}</b>　剩 <b>${left}</b> 次
+          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer">
+            <input type="checkbox" id="coUsePlan" onchange="toggleUsePlan()" style="width:18px;height:18px">
+            <span>用包月卡折抵（金額自動記 0）</span>
+          </label></div>`;
+      }
+    }
+  }
   document.getElementById('tab-service').innerHTML=`
     <h3 class="sec">結帳：${p.name||''} <span class="breed">${p.breed||''}</span></h3>
     <div class="card">
+      ${planInfo}
       <label class="lbl">主服務</label>
       <select class="fld" id="coType" onchange="coRecalc(${p.price_wash||0},${p.price_full||0},${p.price_monthly||0})">
         <option value="wash">洗澡 $${p.price_wash||0}</option>
-        <option value="full">大美容 $${p.price_full||0}</option>
-        <option value="monthly">包月 $${p.price_monthly||0}</option>
+        <option value="full">大美容/剪毛 $${p.price_full||0}</option>
         <option value="nail">指甲</option><option value="other">其他</option></select>
       <label class="lbl">加價項目（點選後填金額）</label>
       <div id="coAddonBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -304,11 +320,20 @@ function checkout(a){
         <button type="button" class="btn btn-y" id="payCash" onclick="pickPay('現金')">💵 現金</button>
         <button type="button" class="btn btn-gray" id="payBank" onclick="pickPay('台新')">🏦 台新</button>
       </div>
-      <button class="btn btn-g" onclick='saveCheckout(${JSON.stringify({apptId:a.id,petId:p.id}).replace(/'/g,"&#39;")})'>確認結帳</button>
+      <button class="btn btn-g" onclick='saveCheckout(${JSON.stringify({apptId:a.id,petId:p.id,petName:p.name}).replace(/'/g,"&#39;")})'>確認結帳</button>
       <button class="btn btn-gray" style="margin-top:8px" onclick="loadHome()">取消</button>
     </div>`;
   coPay='現金';coBase=p.price_wash||0;
 }
+
+// 勾選包月折抵 → 金額鎖0變灰
+function toggleUsePlan(){
+  const on=document.getElementById('coUsePlan').checked;
+  const amt=document.getElementById('coAmount');
+  if(on){amt.value=0;amt.disabled=true;amt.style.background='#EDF0F5';}
+  else{amt.disabled=false;amt.style.background='#fff';sumTotal();}
+}
+
 let coPay='現金',coBase=0;
 function pickPay(m){coPay=m;document.getElementById('payCash').className='btn '+(m==='現金'?'btn-y':'btn-gray')+' ';document.getElementById('payBank').className='btn '+(m==='台新'?'btn-y':'btn-gray')+' ';}
 function coRecalc(w,f,m){
@@ -336,21 +361,60 @@ function sumTotal(){
   document.getElementById('coAmount').value=total;
 }
 async function saveCheckout(o){
-  const today=fmt(new Date());const type=document.getElementById('coType').value;
-  const amount=+document.getElementById('coAmount').value||0;
+  const today=fmt(new Date());
+  const type=document.getElementById('coType').value;
+  const usePlan=document.getElementById('coUsePlan')?.checked||false;
+  let amount=+document.getElementById('coAmount').value||0;
   const addonText=coAddons.filter(a=>a.amount>0).map(a=>`${a.name}$${a.amount}`).join('、')||null;
   const acctId=acctIdByLabel(coPay);
-  // 1) 先寫服務紀錄，拿回 id
-  const {data:sr}=await sb.from('service_records').insert({pet_id:o.petId,service_date:today,service_type:type,amount,addons:addonText}).select().single();
-  // 2) 寫帳本，綁定服務紀錄 id
-  await sb.from('transactions').insert({txn_date:today,kind:'income',txn_type:'income',in_pnl:true,amount,account_id:acctId,service_record_id:sr?sr.id:null,note:(typeText[type]||type)+(addonText?(' '+addonText):'')+' / '+(o.petName||'')});
-  // 3) 包月扣次
-  if(type==='monthly'){const {data:pl}=await sb.from('plans').select('*').eq('pet_id',o.petId).eq('is_active',true).limit(1);
-    if(pl&&pl.length){const cur=pl[0];const used=(cur.used_count||0)+1;await sb.from('plans').update({used_count:used,is_active:used<(cur.total_count||0)}).eq('id',cur.id);}}
-  // 4) 預約標記完成
+  const pts=(type==='full')?2:1; // 大美容/剪毛=2點，其餘1點
+
+  if(usePlan){
+    // === 包月折抵 ===
+    const {data:pl}=await sb.from('plans').select('*').eq('pet_id',o.petId).eq('is_active',true).order('created_at').limit(1);
+    if(!pl||!pl.length){alert('⚠️ 找不到有效包月卡');return;}
+    const cur=pl[0];
+    if((cur.used_count||0)>=(cur.total_count||0)){alert('⚠️ 包月次數已用完，請取消勾選改一般結帳');return;}
+
+    // 第一次服務 → 啟用、算到期日
+    let startDate=cur.start_date,expireDate=cur.expire_date;
+    if(!startDate){
+      startDate=today;
+      const exp=new Date();exp.setDate(exp.getDate()+(cur.plan_days||60));
+      expireDate=fmt(exp);
+    }
+    const usedCount=(cur.used_count||0)+1;
+    const usedPoints=(cur.used_points||0)+pts;
+
+    await sb.from('plans').update({
+      used_count:usedCount,used_points:usedPoints,
+      start_date:startDate,expire_date:expireDate,
+      is_active:usedCount<(cur.total_count||0)
+    }).eq('id',cur.id);
+
+    // 服務紀錄金額0、標包月第幾次（不寫帳本，錢開卡時已收）
+    await sb.from('service_records').insert({
+      pet_id:o.petId,service_date:today,service_type:type,amount:0,addons:addonText,
+      note:'包月第'+usedCount+'/'+cur.total_count+'次'
+    });
+
+  } else {
+    // === 一般結帳 ===
+    const {data:sr}=await sb.from('service_records').insert({
+      pet_id:o.petId,service_date:today,service_type:type,amount,addons:addonText
+    }).select().single();
+    await sb.from('transactions').insert({
+      txn_date:today,kind:'income',txn_type:'income',in_pnl:true,
+      amount,account_id:acctId,service_record_id:sr?sr.id:null,
+      note:(typeText[type]||type)+(addonText?(' '+addonText):'')+' / '+(o.petName||'')
+    });
+  }
+
   if(o.apptId)await sb.from('appointments').update({status:'done'}).eq('id',o.apptId);
-  alert('✅ 結帳完成！收款 $'+amount+'（'+coPay+'）');loadHome();
+  alert(usePlan?'✅ 包月折抵完成！':'✅ 結帳完成！收款 $'+amount+'（'+coPay+'）');
+  loadHome();
 }
+
 
 
 // ===== 帳戶 =====
