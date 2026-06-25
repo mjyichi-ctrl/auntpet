@@ -70,6 +70,9 @@ label.lbl{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
 .wtable td.biz{background:rgba(255,199,44,.10)}
 .wtable td.timecol{background:#FAFBFD;color:var(--muted);font-weight:bold;min-width:40px;cursor:default}
 .wtable td.half{border-top:1px dashed var(--line)}
+.wtable td.hourline{border-top:2px solid rgba(20,30,50,.22)}
+.appt-chip.done{background:#C8CDD6;color:#5A6472;text-decoration:line-through;opacity:.75}
+.appt-chip .ct{font-weight:bold;margin-right:2px}
 .appt-chip{background:linear-gradient(135deg,#34D17F,#22A45D);color:#fff;border-radius:5px;font-size:10px;padding:1px 3px;display:block;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:bold}
 .zoombtns{display:flex;gap:8px;justify-content:center;margin:10px 0}
 .zoombtns button{width:44px;height:38px;border:1px solid var(--card-border);background:#fff;color:var(--lemon-soft);border-radius:10px;font-size:18px;font-weight:bold;cursor:pointer}
@@ -610,12 +613,18 @@ async function loadWeek(){
   head+='</tr>';let rows='';
   for(let h=10;h<=20;h++){for(const part of [0,30]){
     rows+=`<tr><td class="timecol ${part===30?'half':''}">${part===0?h:''}${part===30?'':':00'}</td>`;
-    days.forEach(d=>{let cls=part===30?'half ':'';if(h>=11&&h<19)cls+='biz';const k=fmt(d)+'_'+h+'_'+part;
-      const cell=(map[k]||[]).map(a=>`<span class="appt-chip" onclick="event.stopPropagation();openApptDetail('${a.id}','${a.pet_id||''}')">${a.pets?.name||'預約'}</span>`).join('');
-      const tstr=`${h}:${part===0?'00':'30'}`;rows+=`<td class="${cls}" onclick="quickAppt('${fmt(d)}','${tstr}')">${cell}</td>`;});
+    days.forEach(d=>{let cls=part===30?'half ':(part===0?'hourline ':'');if(h>=11&&h<19)cls+='biz';const k=fmt(d)+'_'+h+'_'+part;
+      const tstr2=`${h}:${part===0?'00':'30'}`;
+      const cell=(map[k]||[]).map(a=>{
+        const done=a.status==='done';
+        const t=showTime(a.start_time);
+        return `<span class="appt-chip ${done?'done':''}" onclick="event.stopPropagation();openApptDetail('${a.id}','${a.pet_id||''}')"><span class="ct">${t}</span>${done?'✓':''}${a.pets?.name||'預約'}</span>`;
+      }).join('');
+      rows+=`<td class="${cls}" onclick="quickAppt('${fmt(d)}','${tstr2}')">${cell}</td>`;});
     rows+='</tr>';}}
   document.getElementById('weekInner').innerHTML=`<table class="wtable">${head}${rows}</table>`;zoomWeek(0);
 }
+
 (function(){let d0=0,base=1;const z=()=>document.getElementById('weekZoom');
   document.addEventListener('touchstart',e=>{if(e.touches.length===2&&z()&&z().contains(e.target)){d0=dist(e);base=zoomLevel}},{passive:true});
   document.addEventListener('touchmove',e=>{if(e.touches.length===2&&z()&&z().contains(e.target)){const r=dist(e)/d0;zoomLevel=Math.min(2.5,Math.max(.6,base*r));document.getElementById('weekInner').style.transform=`scale(${zoomLevel})`}},{passive:true});
