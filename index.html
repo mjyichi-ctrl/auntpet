@@ -302,64 +302,67 @@ const ADDON_PRESETS=['拆結費','梳理廢毛','冰河泥','深層潤絲','SPA'
 let coAddons=[]; // [{name, amount}]
 async function checkout(a){
   const p=a.pets||{};coAddons=[];go('service');
-  // 先抓有效包月卡
-  let planInfo='';
+  let plan=null;
   if(p.id){
     const {data:pl}=await sb.from('plans').select('*').eq('pet_id',p.id).eq('is_active',true).order('created_at').limit(1);
-    if(pl&&pl.length){
-      const c=pl[0];const left=(c.total_count||0)-(c.used_count||0);
-      if(left>0){
-        planInfo=`<div class="plan" style="background:rgba(34,164,93,.12)">
-          🎫 <b>${c.plan_name||'包月卡'}</b>　剩 <b>${left}</b> 次
-          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:14px;cursor:pointer">
-            <input type="checkbox" id="coUsePlan" onchange="toggleUsePlan()" style="width:18px;height:18px">
-            <span>用包月卡折抵（金額自動記 0）</span>
-          </label></div>`;
-      }
-    }
+    if(pl&&pl.length){const c=pl[0];if((c.total_count||0)-(c.used_count||0)>0)plan=c;}
   }
-  document.getElementById('tab-service').innerHTML=`
-    <h3 class="sec">結帳：${p.name||''} <span class="breed">${p.breed||''}</span></h3>
-    <div class="card">
-      ${planInfo}
-      <label class="lbl">主服務</label>
-      <select class="fld" id="coType" onchange="coRecalc(${p.price_wash||0},${p.price_full||0},${p.price_monthly||0})">
-        <option value="wash">洗澡 $${p.price_wash||0}</option>
-        <option value="full">大美容/剪毛 $${p.price_full||0}</option>
-        <option value="nail">指甲</option><option value="other">其他</option></select>
-      <label class="lbl">加價項目（點選後填金額）</label>
-      <div id="coAddonBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-        ${ADDON_PRESETS.map((n,i)=>`<button type="button" class="btn btn-gray btn-sm" id="addonBtn${i}" onclick="toggleAddon(${i})">${n}</button>`).join('')}
-      </div>
-      <div id="coAddonList" style="margin-bottom:8px"></div>
-      <label class="lbl">總金額（可手動修改）</label>
-      <input class="fld" id="coAmount" type="number" value="${p.price_wash||0}">
+  window._coPlan=plan; window._coAppt={apptId:a.id,petId:p.id,petName:p.name};
+  window._coType=plan?'':'wash';
+  window._coPrice={wash:p.price_wash||0,full:p.price_full||0};
+
+  let html=`<h3 class="sec">結帳：${p.name||''} <span class="breed">${p.breed||''}</span></h3><div class="card">`;
+  if(plan){
+    const left=(plan.total_count||0)-(plan.used_count||0);
+    html+=`<div class="plan" style="background:rgba(34,164,93,.12)">🎫 <b>${plan.plan_name||'包月卡'}</b>　剩 <b>${left}</b> 次</div>
+      <label class="lbl">這次服務（包月折抵）</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button type="button" class="btn btn-gray" id="svcWash" onclick="pickSvc('wash')">🛁 洗澡 扣1點</button>
+        <button type="button" class="btn btn-gray" id="svcFull" onclick="pickSvc('full')">✂️ 大美容 扣2點</button>
+      </div>`;
+  } else {
+    html+=`<label class="lbl">單次服務</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button type="button" class="btn btn-y" id="svcWash" onclick="pickSvc('wash')">🛁 洗澡 $${p.price_wash||0}</button>
+        <button type="button" class="btn btn-gray" id="svcFull" onclick="pickSvc('full')">✂️ 大美容 $${p.price_full||0}</button>
+      </div>`;
+  }
+  html+=`<label class="lbl">${plan?'額外加購（拖太久打結等，另收費）':'加價項目'}</label>
+    <div id="coAddonBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+      ${ADDON_PRESETS.map((n,i)=>`<button type="button" class="btn btn-gray btn-sm" id="addonBtn${i}" onclick="toggleAddon(${i})">${n}</button>`).join('')}
+    </div>
+    <div id="coAddonList" style="margin-bottom:8px"></div>
+    <label class="lbl">總金額${plan?'（只算加購）':'（可手動修改）'}</label>
+    <input class="fld" id="coAmount" type="number" value="${plan?0:(p.price_wash||0)}">
+    <div id="payWrap">
       <label class="lbl">收款帳戶</label>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <button type="button" class="btn btn-y" id="payCash" onclick="pickPay('現金')">💵 現金</button>
         <button type="button" class="btn btn-gray" id="payBank" onclick="pickPay('台新')">🏦 台新</button>
       </div>
-      <button class="btn btn-g" onclick='saveCheckout(${JSON.stringify({apptId:a.id,petId:p.id,petName:p.name}).replace(/'/g,"&#39;")})'>確認結帳</button>
-      <button class="btn btn-gray" style="margin-top:8px" onclick="loadHome()">取消</button>
-    </div>`;
-  coPay='現金';coBase=p.price_wash||0;
+    </div>
+    <button class="btn btn-g" onclick="saveCheckout(window._coAppt)">確認結帳</button>
+    <button class="btn btn-gray" style="margin-top:8px" onclick="loadHome()">取消</button></div>`;
+  document.getElementById('tab-service').innerHTML=html;
+  coPay='現金';coBase=plan?0:(p.price_wash||0);
+  if(!plan)pickSvc('wash');
+  updatePayVisible();
 }
 
-// 勾選包月折抵 → 金額鎖0變灰
-function toggleUsePlan(){
-  const on=document.getElementById('coUsePlan').checked;
-  const amt=document.getElementById('coAmount');
-  if(on){amt.value=0;amt.disabled=true;amt.style.background='#EDF0F5';}
-  else{amt.disabled=false;amt.style.background='#fff';sumTotal();}
+function pickSvc(t){
+  window._coType=t;
+  document.getElementById('svcWash').className='btn '+(t==='wash'?(window._coPlan?'btn-g':'btn-y'):'btn-gray');
+  document.getElementById('svcFull').className='btn '+(t==='full'?(window._coPlan?'btn-g':'btn-y'):'btn-gray');
+  coBase=window._coPlan?0:(window._coPrice[t]||0);
+  sumTotal();
 }
-
+function updatePayVisible(){
+  const total=+document.getElementById('coAmount').value||0;
+  const show=window._coPlan?(total>0):true;
+  document.getElementById('payWrap').style.display=show?'block':'none';
+}
 let coPay='現金',coBase=0;
-function pickPay(m){coPay=m;document.getElementById('payCash').className='btn '+(m==='現金'?'btn-y':'btn-gray')+' ';document.getElementById('payBank').className='btn '+(m==='台新'?'btn-y':'btn-gray')+' ';}
-function coRecalc(w,f,m){
-  const t=document.getElementById('coType').value;
-  const map={wash:w,full:f,monthly:m,nail:0,other:0};coBase=map[t]??0;
-  refreshAddonList();
-}
+function pickPay(m){coPay=m;document.getElementById('payCash').className='btn '+(m==='現金'?'btn-y':'btn-gray');document.getElementById('payBank').className='btn '+(m==='台新'?'btn-y':'btn-gray');}
 function toggleAddon(i){
   const name=ADDON_PRESETS[i];const idx=coAddons.findIndex(x=>x.name===name);
   const btn=document.getElementById('addonBtn'+i);
@@ -378,48 +381,41 @@ function setAddonAmt(i,v){coAddons[i].amount=+v||0;sumTotal();}
 function sumTotal(){
   const total=coBase+coAddons.reduce((s,a)=>s+(+a.amount||0),0);
   document.getElementById('coAmount').value=total;
+  if(typeof updatePayVisible==='function')updatePayVisible();
 }
 async function saveCheckout(o){
   const today=fmt(new Date());
-  const type=document.getElementById('coType').value;
-  const usePlan=document.getElementById('coUsePlan')?.checked||false;
-  let amount=+document.getElementById('coAmount').value||0;
+  const type=window._coType;
+  if(!type){alert('請先選這次的服務（洗澡或大美容）');return;}
+  const plan=window._coPlan;
+  const amount=+document.getElementById('coAmount').value||0;
   const addonText=coAddons.filter(a=>a.amount>0).map(a=>`${a.name}$${a.amount}`).join('、')||null;
   const acctId=acctIdByLabel(coPay);
-  const pts=(type==='full')?2:1; // 大美容/剪毛=2點，其餘1點
+  const pts=(type==='full')?2:1;
 
-  if(usePlan){
-    // === 包月折抵 ===
-    const {data:pl}=await sb.from('plans').select('*').eq('pet_id',o.petId).eq('is_active',true).order('created_at').limit(1);
-    if(!pl||!pl.length){alert('⚠️ 找不到有效包月卡');return;}
-    const cur=pl[0];
-    if((cur.used_count||0)>=(cur.total_count||0)){alert('⚠️ 包月次數已用完，請取消勾選改一般結帳');return;}
-
-    // 第一次服務 → 啟用、算到期日
-    let startDate=cur.start_date,expireDate=cur.expire_date;
-    if(!startDate){
-      startDate=today;
-      const exp=new Date();exp.setDate(exp.getDate()+(cur.plan_days||60));
-      expireDate=fmt(exp);
-    }
-    const usedCount=(cur.used_count||0)+1;
-    const usedPoints=(cur.used_points||0)+pts;
-
+  if(plan){
+    let startDate=plan.start_date,expireDate=plan.expire_date;
+    if(!startDate){startDate=today;const exp=new Date();exp.setDate(exp.getDate()+(plan.plan_days||60));expireDate=fmt(exp);}
+    const usedCount=(plan.used_count||0)+1;
+    const usedPoints=(plan.used_points||0)+pts;
     await sb.from('plans').update({
       used_count:usedCount,used_points:usedPoints,
       start_date:startDate,expire_date:expireDate,
-      is_active:usedCount<(cur.total_count||0)
-    }).eq('id',cur.id);
-
-    // 服務紀錄金額0、標包月第幾次（不寫帳本，錢開卡時已收）
-    await sb.from('service_records').insert({
-      pet_id:o.petId,service_date:today,service_type:type,amount:0,addons:addonText,
+      is_active:usedCount<(plan.total_count||0)
+    }).eq('id',plan.id);
+    const {data:sr}=await sb.from('service_records').insert({
+      pet_id:o.petId,service_date:today,service_type:type,amount:amount,addons:addonText,
       monthly_seq:usedCount,
-      raw_text:'包月第'+usedCount+'/'+cur.total_count+'次（'+(typeText[type]||type)+'）'
-    });
-
+      raw_text:'包月第'+usedCount+'/'+plan.total_count+'次（'+(typeText[type]||type)+'）'+(addonText?'+加購':'')
+    }).select().single();
+    if(amount>0){
+      await sb.from('transactions').insert({
+        txn_date:today,kind:'income',txn_type:'income',in_pnl:true,
+        amount,account_id:acctId,service_record_id:sr?sr.id:null,
+        note:'包月加購 '+(addonText||'')+' / '+(o.petName||'')
+      });
+    }
   } else {
-    // === 一般結帳 ===
     const {data:sr}=await sb.from('service_records').insert({
       pet_id:o.petId,service_date:today,service_type:type,amount,addons:addonText
     }).select().single();
@@ -429,13 +425,10 @@ async function saveCheckout(o){
       note:(typeText[type]||type)+(addonText?(' '+addonText):'')+' / '+(o.petName||'')
     });
   }
-
   if(o.apptId)await sb.from('appointments').update({status:'done'}).eq('id',o.apptId);
-  alert(usePlan?'✅ 包月折抵完成！':'✅ 結帳完成！收款 $'+amount+'（'+coPay+'）');
+  alert(plan?(amount>0?'✅ 包月折抵完成！額外收 $'+amount:'✅ 包月折抵完成！'):'✅ 結帳完成！收款 $'+amount+'（'+coPay+'）');
   loadHome();
 }
-
-
 
 // ===== 帳戶 =====
 let ACCOUNTS=[];
