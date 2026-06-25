@@ -395,7 +395,8 @@ async function saveCheckout(o){
     // 服務紀錄金額0、標包月第幾次（不寫帳本，錢開卡時已收）
     await sb.from('service_records').insert({
       pet_id:o.petId,service_date:today,service_type:type,amount:0,addons:addonText,
-      note:'包月第'+usedCount+'/'+cur.total_count+'次'
+      monthly_seq:usedCount,
+      raw_text:'包月第'+usedCount+'/'+cur.total_count+'次（'+(typeText[type]||type)+'）'
     });
 
   } else {
@@ -692,7 +693,7 @@ async function openPet(id){
       <p style="color:var(--muted);font-size:13px;margin-top:4px">📞 ${p.customers?.phone||'—'}</p>
       ${p.notes?`<p class="warn">⚠ ${p.notes}</p>`:''}
       <p style="font-size:13px;margin-top:6px">洗 $${p.price_wash||0}　大美 $${p.price_full||0}　包月 $${p.price_monthly||0}</p>
-      ${plan?`<div class="plan"><b>包月進行中：</b>${plan.used_count||0}/${plan.total_count||0} 次　到期 ${plan.expire_date||'—'}</div>`:''}
+      ${plan?`<div class="plan"><b>🎫 ${plan.plan_name||'包月卡'}</b><br>剩 <b>${(plan.total_count||0)-(plan.used_count||0)}</b> 次（已用 ${plan.used_count||0}/${plan.total_count||0}）　已用 ${plan.used_points||0} 點<br>均價 $${plan.used_points>0?Math.round((plan.amount||0)/plan.used_points):'—'}/點　${plan.expire_date?'到期 '+plan.expire_date:'尚未啟用'}</div>`:''}
       ${future&&future.length?`<div class="plan" style="background:rgba(255,199,44,.12)"><b>📅 未來預約</b>${future.map(f=>`<br>${showDateShort(f.start_time)} ${showTime(f.start_time)} ${f.service_note||''}`).join('')}</div>`:''}
       <button class="btn btn-g" style="margin-top:10px" onclick='checkout(${JSON.stringify({id:future&&future[0]?future[0].id:null,pets:p}).replace(/'/g,"&#39;")})'>＋ 登記今日服務</button><button class="btn btn-b" style="margin-top:8px" onclick='openNewPlan(${JSON.stringify({id:p.id,name:p.name}).replace(/'/g,"&#39;")})'>🎫 開包月卡</button></div>
     <h3 class="sec">歷史紀錄（${recs?.length||0}）</h3>
