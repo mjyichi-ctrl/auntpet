@@ -154,7 +154,7 @@ label.lbl{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
 
     <div id="tab-home">
       <div class="stat-row">
-        <div class="stat"><div class="label">今日預約</div><div class="num" id="todayCount">0</div></div>
+        <div class="stat"><div class="label">預約數量</div><div class="num" id="todayCount">0</div></div>
         <div class="stat"><div class="label">今日營收</div><div class="num" id="todayRev">$0</div></div>
       </div>
       <button class="btn btn-y" onclick="openNewAppt()">＋ 建立預約</button>
@@ -263,21 +263,40 @@ function go(tab,el){
 async function loadHome(){
   go('home',document.getElementById('nav-home'));
   const today=fmt(new Date());
-  const {data:appts}=await sb.from('appointments').select('*,pets(id,name,breed,notes,price_wash,price_full,price_monthly)').gte('start_time',today+'T00:00:00').lte('start_time',today+'T23:59:59').order('start_time');
+  // 抓所有「未完成」的預約（不限今天），依時間排序
+  const {data:appts}=await sb.from('appointments')
+    .select('*,pets(id,name,breed,notes,price_wash,price_full,price_monthly)')
+    .neq('status','done')
+    .order('start_time');
   const list=document.getElementById('todayList');
-  if(!appts||!appts.length){list.innerHTML='<p class="center">今天還沒有預約</p>';}
-  else{list.innerHTML=appts.map(a=>`
-      <div class="card ${a.status==='done'?'appt-done':''}" style="cursor:pointer" onclick="openApptDetail('${a.id}','${a.pets?.id||''}')">
-        <div class="appt-row"><div class="appt-info">
-          <span class="time-big">${showTime(a.start_time)}</span>　${a.pets?.name||''}<span class="breed">${a.pets?.breed||''}</span>
-          ${a.service_note?`<p style="font-size:12px;color:var(--muted);margin-top:4px">${a.service_note}</p>`:''}
-          ${a.pets?.notes?`<p class="warn">⚠ ${a.pets.notes}</p>`:''}
-        </div><div>${a.status==='done'?`<span class="tag-done">✓ 已收 $${a.paid_amount||0}</span>`:`<button class="btn btn-g btn-sm" onclick='event.stopPropagation();checkout(${JSON.stringify(a).replace(/'/g,"&#39;")})'>✓ 完成</button>`}</div></div>
-      </div>`).join('');}
+  if(!appts||!appts.length){list.innerHTML='<p class="center">目前沒有未完成的預約 🎉</p>';}
+  else{
+    // 依日期分組顯示
+    const byDate={};
+    appts.forEach(a=>{const dk=fmt(new Date(a.start_time));(byDate[dk]=byDate[dk]||[]).push(a);});
+    const dates=Object.keys(byDate).sort();
+    list.innerHTML=dates.map(dk=>{
+      const isToday=(dk===today);
+      const d=new Date(dk+'T00:00:00');
+      const wd=['日','一','二','三','四','五','六'][d.getDay()];
+      const dateLabel=isToday?'🔴 今天':`${d.getMonth()+1}/${d.getDate()}（${wd}）`;
+      const rows=byDate[dk].map(a=>`
+        <div class="card" style="cursor:pointer" onclick="openApptDetail('${a.id}','${a.pets?.id||''}')">
+          <div class="appt-row"><div class="appt-info">
+            <span class="time-big">${showTime(a.start_time)}</span>　${a.pets?.name||''}<span class="breed">${a.pets?.breed||''}</span>
+            ${a.service_note?`<p style="font-size:12px;color:var(--muted);margin-top:4px">${a.service_note}</p>`:''}
+            ${a.pets?.notes?`<p class="warn">⚠ ${a.pets.notes}</p>`:''}
+          </div><div><button class="btn btn-g btn-sm" onclick='event.stopPropagation();checkout(${JSON.stringify(a).replace(/'/g,"&#39;")})'>✓ 完成</button></div></div>
+        </div>`).join('');
+      return `<h3 class="sec" style="color:${isToday?'var(--red)':'var(--lemon-soft)'}">${dateLabel}（${byDate[dk].length}）</h3>${rows}`;
+    }).join('');
+  }
   document.getElementById('todayCount').textContent=appts?.length||0;
+  // 今日營收照舊
   const {data:txn}=await sb.from('transactions').select('amount').eq('txn_date',today).eq('kind','income');
   document.getElementById('todayRev').textContent='$'+((txn||[]).reduce((s,t)=>s+(t.amount||0),0)).toLocaleString();
 }
+
 
 const ADDON_PRESETS=['拆結費','梳理廢毛','冰河泥','深層潤絲','SPA','清耳朵','拔耳毛','剪磨指甲','貴賓腳'];
 let coAddons=[]; // [{name, amount}]
