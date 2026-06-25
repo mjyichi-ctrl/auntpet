@@ -703,9 +703,9 @@ async function openPet(id){
   const pts=(r.service_type==='full')?2:1;
   const amtShow=isPlan?`🎫扣${pts}點`:('$'+(r.amount||0));
   return `<div class="history-item" style="display:flex;justify-content:space-between;align-items:center"><div><span class="hd">${r.service_date}</span>　${typeText[r.service_type]||r.service_type}${r.monthly_seq?'(第'+r.monthly_seq+'次)':''}　${amtShow}${r.addons?' '+r.addons:''}</div><button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`;
-}).join('')||'<p class="center">無紀錄</p>'}</div>
-<button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`).join('')||'<p class="center">無紀錄</p>'}</div>`;
+}).join('')||'<p class="center">無紀錄</p>'}</div>`;
 }
+
   
 const PLAN_PRESETS=[
   {name:'預付5次洗澡(60天內)送剪毛一次', count:5, points:6, days:60},
