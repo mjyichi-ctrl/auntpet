@@ -634,16 +634,32 @@ async function openPet(id){
     <h3 class="sec">歷史紀錄（${recs?.length||0}）</h3>
 <div class="card">${(recs||[]).map(r=>`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center"><div><span class="hd">${r.service_date}</span>　${typeText[r.service_type]||r.service_type}${r.monthly_seq?'('+r.monthly_seq+')':''}　$${r.amount||0}${r.addons?' '+r.addons:''}</div><button onclick="delServiceRecord('${r.id}','${id}')" style="border:none;background:#EDF0F5;border-radius:8px;padding:5px 9px;cursor:pointer">🗑</button></div>`).join('')||'<p class="center">無紀錄</p>'}</div>`;
 }
-  function openNewPlan(o){
+  
+const PLAN_PRESETS=[
+  {name:'預付5次洗澡(60天內)送剪毛一次', count:5, points:6, days:60},
+  {name:'預付5次洗澡(60天內)送洗澡一次', count:6, points:6, days:60},
+  {name:'舊客專屬：洗3剪1(45天內)',      count:4, points:5, days:45}
+];
+
+function openNewPlan(o){
   document.getElementById('modalRoot').innerHTML=`
   <div class="modal"><div class="mbox">
     <h3>🎫 幫 ${o.name} 開包月卡</h3>
-    <label class="lbl">方案名稱</label>
-    <input class="fld" id="planName" placeholder="例：舊制洗3剪1 / 小型剪毛犬 / 中大型免剪">
+    <label class="lbl">選方案</label>
+    <select class="fld" id="planSelect" onchange="planSelectChange()">
+      ${PLAN_PRESETS.map((p,i)=>`<option value="${i}">${p.name}</option>`).join('')}
+      <option value="__custom__">✏️ 自訂方案（手動輸入）</option>
+    </select>
+    <div id="planCustomWrap" style="display:none">
+      <label class="lbl">自訂方案名稱</label>
+      <input class="fld" id="planName" placeholder="輸入方案名稱">
+    </div>
     <label class="lbl">服務次數（共幾次）</label>
-    <input class="fld" id="planCount" type="number" placeholder="例：4">
+    <input class="fld" id="planCount" type="number">
     <label class="lbl">總點數（洗算1、剪算2）</label>
-    <input class="fld" id="planPoints" type="number" placeholder="例：5">
+    <input class="fld" id="planPoints" type="number">
+    <label class="lbl">期限（天數）</label>
+    <input class="fld" id="planDays" type="number">
     <label class="lbl">預付金額</label>
     <input class="fld" id="planAmt" type="number" placeholder="例：1800">
     <label class="lbl">收款帳戶</label>
@@ -651,35 +667,61 @@ async function openPet(id){
     <button class="btn btn-g" onclick="savePlan('${o.id}')">確認開卡</button>
     <button class="btn btn-gray" style="margin-top:8px" onclick="closeModal()">取消</button>
   </div></div>`;
+  planSelectChange(); // 開窗時先帶入第一個方案的預設值
 }
+
+function planSelectChange(){
+  const v=document.getElementById('planSelect').value;
+  const isCustom=(v==='__custom__');
+  document.getElementById('planCustomWrap').style.display=isCustom?'block':'none';
+  if(!isCustom){
+    const p=PLAN_PRESETS[+v];
+    document.getElementById('planCount').value=p.count;
+    document.getElementById('planPoints').value=p.points;
+    document.getElementById('planDays').value=p.days;
+  }
+}
+
 async function savePlan(petId){
-  const name=document.getElementById('planName').value.trim();
+  const sel=document.getElementById('planSelect').value;
+  const name=(sel==='__custom__')
+    ?document.getElementById('planName').value.trim()
+    :PLAN_PRESETS[+sel].name;
   const count=+document.getElementById('planCount').value||0;
   const points=+document.getElementById('planPoints').value||0;
+  const days=+document.getElementById('planDays').value||60;
   const amt=+document.getElementById('planAmt').value||0;
   const acctId=document.getElementById('planAcct').value;
+
   if(!name){alert('請填方案名稱');return}
   if(!count){alert('請填服務次數');return}
   if(!amt){alert('請填預付金額');return}
+
   const today=fmt(new Date());
-  const expire=new Date();expire.setDate(expire.getDate()+60);
-  // 1) 建立包月卡
+
+  // 開卡只預收，start_date 與 expire_date 留空（等第一次服務才啟用）
+  // 把 days 暫存在 plan_name 後面？不行 → 直接用獨立記法
   await sb.from('plans').insert({
     pet_id:petId, plan_type:'monthly', plan_name:name,
     total_count:count, used_count:0,
     total_points:points, used_points:0,
-    amount:amt, start_date:today, expire_date:fmt(expire), is_active:true
+    plan_days:days,                 // 期限天數，等第一次服務時用
+    amount:amt,
+    start_date:null, expire_date:null,   // 未啟用
+    is_active:true
   });
-  // 2) 帳本記一筆「包月預收」
+
   await sb.from('transactions').insert({
     txn_date:today, kind:'income', txn_type:'income', in_pnl:true,
     amount:amt, account_id:acctId,
     note:'包月預收 '+name
   });
-  alert('✅ 開卡成功！預收 $'+amt);
+
+  alert('✅ 開卡成功！預收 $'+amt+'（等第一次服務啟用60/45天）');
   closeModal();
   openPet(petId);
 }
+
 
 async function delServiceRecord(srId, petId){
   if(!confirm('確定刪除這筆服務紀錄？對應的帳本收入也會一起刪除喔')) return;
