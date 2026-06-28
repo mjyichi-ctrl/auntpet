@@ -699,7 +699,7 @@ function doSearch(){clearTimeout(sTimer);sTimer=setTimeout(async()=>{
   const q=document.getElementById('searchInput').value.trim();
   const sort=document.getElementById('searchSort')?.value||'name';
   let query=sb.from('pets').select('*,customers(phone)');
-  if(q){query=query.or(`name.ilike.%${q}%,breed.ilike.%${q}%`);}
+  if(q){query=query.or(`name.ilike.%${q}%,breed.ilike.%${q}%,contract_no.ilike.%${q}%`);}
   // 排序
   if(sort==='name')query=query.order('name',{ascending:true});
   else if(sort==='recent')query=query.order('created_at',{ascending:false});
@@ -710,8 +710,7 @@ function doSearch(){clearTimeout(sTimer);sTimer=setTimeout(async()=>{
   if(q && /^\d+$/.test(q)){const {data:byPhone}=await sb.from('customers').select('id,phone,pets(*)').ilike('phone',`%${q}%`).limit(20);(byPhone||[]).forEach(c=>(c.pets||[]).forEach(p=>extra.push({...p,customers:{phone:c.phone}})));}
   const all=[...(data||[]),...extra];const seen=new Set();const uniq=all.filter(p=>seen.has(p.id)?false:seen.add(p.id));
   document.getElementById('searchCount').textContent=`共 ${uniq.length} 位`;
-  document.getElementById('searchList').innerHTML=uniq.length?uniq.map(p=>`<div class="card" onclick="openPet('${p.id}')"><b>${p.name}</b><span class="breed">${p.breed||''}</span><span style="float:right;color:var(--muted);font-size:13px">${p.customers?.phone||''}</span></div>`).join(''):'<p class="center">查無資料</p>';
-},300);}
+document.getElementById('searchList').innerHTML=uniq.length?uniq.map(p=>`<div class="card" onclick="openPet('${p.id}')"><b>${p.name}</b><span class="breed">${p.breed||''}</span>${p.contract_no?`<span style="font-size:11px;color:var(--lemon-soft);margin-left:6px">#${p.contract_no}</span>`:''}<span style="float:right;color:var(--muted);font-size:13px">${p.customers?.phone||''}</span></div>`).join(''):'<p class="center">查無資料</p>';
 
 
 async function openApptDetail(apptId,petId){
@@ -719,7 +718,7 @@ async function openApptDetail(apptId,petId){
   if(!a){alert('找不到預約');return}const p=a.pets||{};go('service');
   document.getElementById('tab-service').innerHTML=`<h3 class="sec">預約詳情</h3>
     <div class="card"><h3 style="font-size:18px">${showTime(a.start_time)}　${p.name||''} <span class="breed">${p.breed||''}</span></h3>
-      <p style="color:var(--muted);font-size:13px;margin-top:4px">📞 ${p.customers?.phone||'—'}</p>
+      <p style="color:var(--muted);font-size:13px;margin-top:4px">📞 ${p.customers?.phone||'—'}${p.contract_no?`　📄 契約 #${p.contract_no}`:''}</p>
       ${p.notes?`<p class="warn">⚠ ${p.notes}</p>`:''}${a.service_note?`<p style="font-size:13px;margin-top:6px">服務：${a.service_note}</p>`:''}
       <p style="font-size:13px;color:var(--muted);margin-top:6px">狀態：${a.status==='done'?'已完成':'待服務'}</p></div>
     ${petId?`<button class="btn btn-b" onclick="openPet('${petId}')">👤 看客戶完整資料</button>`:''}
@@ -858,7 +857,8 @@ async function delServiceRecord(srId, petId){
   async function editPet(id){
   go('edit');const {data:p}=await sb.from('pets').select('*,customers(id,phone)').eq('id',id).single();
   document.getElementById('tab-edit').innerHTML=`<h3 class="sec">編輯資料</h3>
-    <div class="card"><label class="lbl">寵物名</label><input class="fld" id="eName" value="${p.name||''}">
+    <div class="card"><label class="lbl">契約編號</label><input class="fld" id="eContract" value="${p.contract_no||''}">
+      <label class="lbl">寵物名</label><input class="fld" id="eName" value="${p.name||''}">
       <label class="lbl">品種</label><input class="fld" id="eBreed" value="${p.breed||''}">
       <label class="lbl">電話</label><input class="fld" id="ePhone" value="${p.customers?.phone||''}">
       <label class="lbl">注意事項</label><input class="fld" id="eNotes" value="${p.notes||''}">
@@ -869,8 +869,7 @@ async function delServiceRecord(srId, petId){
       <button class="btn btn-gray" style="margin-top:8px" onclick="openPet('${id}')">取消</button></div>`;
 }
 async function saveEdit(id,custId){
-  await sb.from('pets').update({name:document.getElementById('eName').value,breed:document.getElementById('eBreed').value,notes:document.getElementById('eNotes').value||null,price_wash:+document.getElementById('eW').value||0,price_full:+document.getElementById('eF').value||0,price_monthly:+document.getElementById('eM').value||0}).eq('id',id);
-  if(custId)await sb.from('customers').update({phone:document.getElementById('ePhone').value||null}).eq('id',custId);
+  await sb.from('pets').update({contract_no:document.getElementById('eContract').value||null,name:document.getElementById('eName').value,breed:document.getElementById('eBreed').value,notes:document.getElementById('eNotes').value||null,price_wash:+document.getElementById('eW').value||0,price_full:+document.getElementById('eF').value||0,price_monthly:+document.getElementById('eM').value||0}).eq('id',id);
   alert('已儲存');openPet(id);
 }
 </script>
