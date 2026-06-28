@@ -194,6 +194,7 @@ label.lbl{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
   <option value="recent">最近新增</option>
   <option value="first_old">初次服務（舊→新）</option>
   <option value="last_new">最後服務（新→舊）</option>
+  <option value="contract">契約編號</option>
 </select>
   </div>
   <div id="searchCount" style="font-size:12px;color:var(--muted);margin-bottom:6px"></div>
@@ -715,6 +716,14 @@ async function doSearch(){
   }
   renderSearch();
 }
+function contractRank(s){
+  if(!s)return [9,0,''];
+  if(/^2026/.test(s))return [8,parseInt(s),s];                 // 網路契約→獨立排最後群
+  if(/^114/.test(s))return [0,parseInt(s.replace(/\D/g,'')),s]; // 第1代 民國紙本
+  if(/^\d{3}$/.test(s))return [1,parseInt(s),s];               // 紙本三碼
+  if(/^0\d{3}$/.test(s))return [2,parseInt(s),s];              // 紙本四碼
+  return [3,0,s];
+}
 function renderSearch(){
   const q=document.getElementById('searchInput').value.trim().toLowerCase();
   const sort=document.getElementById('searchSort')?.value||'freq';
@@ -726,6 +735,12 @@ function renderSearch(){
       ||(p.customers?.phone||'').includes(q);
   });
   list.sort((a,b)=>{
+    if(sort==='contract'){
+      const ra=contractRank(a.contract_no),rb=contractRank(b.contract_no);
+      if(ra[0]!==rb[0])return ra[0]-rb[0];
+      if(ra[1]!==rb[1])return ra[1]-rb[1];
+      return ra[2].localeCompare(rb[2]);
+    }
     if(sort==='name')return (a.name||'').localeCompare(b.name||'');
     if(sort==='recent')return (b.created_at||'').localeCompare(a.created_at||'');
     if(sort==='first_old')return (a._stat.first||'9999').localeCompare(b._stat.first||'9999');
@@ -770,7 +785,7 @@ async function openPet(id){
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center">
       <h3 style="font-size:18px">${p.name} <span class="breed">${p.breed||''}</span></h3>
       <button class="btn btn-b btn-sm" onclick="editPet('${p.id}')">✏️ 編輯</button></div>
-      <p style="color:var(--muted);font-size:13px;margin-top:4px">📞 ${p.customers?.phone||'—'}</p>
+      <p style="color:var(--muted);font-size:13px;margin-top:4px">📞 ${p.customers?.phone||'—'}${p.contract_no?`　📄 契約 #${p.contract_no}`:''}</p>
       ${p.notes?`<p class="warn">⚠ ${p.notes}</p>`:''}
       <p style="font-size:13px;margin-top:6px">洗 $${p.price_wash||0}　大美 $${p.price_full||0}　包月 $${p.price_monthly||0}</p>
       ${plan?`<div class="plan"><b>🎫 ${plan.plan_name||'包月卡'}</b><br>剩 <b>${(plan.total_count||0)-(plan.used_count||0)}</b> 次（已用 ${plan.used_count||0}/${plan.total_count||0}）　已用 ${plan.used_points||0} 點<br>每點 $${plan.total_points>0?Math.round((plan.amount||0)/plan.total_points):'—'}（洗1點/大美2點）
