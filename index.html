@@ -696,7 +696,7 @@ let sTimer;
 function focusSearch(){
   setTimeout(()=>{const el=document.getElementById('searchInput');if(el)el.focus();},100);
   SEARCH_PETS=[];
-  doSearch(); // 一進來就列出全部客戶
+  doSearch();
 }
 let SEARCH_PETS=[];
 async function doSearch(){
