@@ -711,7 +711,7 @@ function doSearch(){clearTimeout(sTimer);sTimer=setTimeout(async()=>{
   const all=[...(data||[]),...extra];const seen=new Set();const uniq=all.filter(p=>seen.has(p.id)?false:seen.add(p.id));
   document.getElementById('searchCount').textContent=`共 ${uniq.length} 位`;
 document.getElementById('searchList').innerHTML=uniq.length?uniq.map(p=>`<div class="card" onclick="openPet('${p.id}')"><b>${p.name}</b><span class="breed">${p.breed||''}</span>${p.contract_no?`<span style="font-size:11px;color:var(--lemon-soft);margin-left:6px">#${p.contract_no}</span>`:''}<span style="float:right;color:var(--muted);font-size:13px">${p.customers?.phone||''}</span></div>`).join(''):'<p class="center">查無資料</p>';
-
+},300);}
 
 async function openApptDetail(apptId,petId){
   const {data:a}=await sb.from('appointments').select('*,pets(id,name,breed,notes,price_wash,price_full,price_monthly,customers(phone))').eq('id',apptId).single();
