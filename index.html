@@ -432,7 +432,7 @@ async function saveCheckout(o){
       await sb.from('transactions').insert({
         txn_date:today,kind:'income',txn_type:'income',in_pnl:true,
         amount,account_id:acctId,service_record_id:sr?sr.id:null,
-        note:'包月加購 '+(addonText||'')+' / '+(o.petName||'')
+        note:'包月加購 '+(addonText||'')
       });
     }
   } else {
@@ -442,7 +442,7 @@ async function saveCheckout(o){
     await sb.from('transactions').insert({
       txn_date:today,kind:'income',txn_type:'income',in_pnl:true,
       amount,account_id:acctId,service_record_id:sr?sr.id:null,
-      note:(typeText[type]||type)+(addonText?(' '+addonText):'')+' / '+(o.petName||'')
+      note:(typeText[type]||type)+(addonText?(' '+addonText):'')
     });
   }
   if(o.apptId)await sb.from('appointments').update({status:'done'}).eq('id',o.apptId);
@@ -831,7 +831,7 @@ function openNewPlan(o){
     <input class="fld" id="planAmt" type="number" placeholder="例：1800">
     <label class="lbl">收款帳戶</label>
     <select class="fld" id="planAcct">${ACCOUNTS.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select>
-    <button class="btn btn-g" onclick="savePlan('${o.id}')">確認開卡</button>
+    <button class="btn btn-g" onclick="savePlan('${o.id}','${o.name}')">確認開卡</button>
     <button class="btn btn-gray" style="margin-top:8px" onclick="closeModal()">取消</button>
   </div></div>`;
   planSelectChange(); // 開窗時先帶入第一個方案的預設值
@@ -849,7 +849,7 @@ function planSelectChange(){
   }
 }
 
-async function savePlan(petId){
+async function savePlan(petId,petName){
   const sel=document.getElementById('planSelect').value;
   const name=(sel==='__custom__')
     ?document.getElementById('planName').value.trim()
@@ -866,22 +866,20 @@ async function savePlan(petId){
 
   const today=fmt(new Date());
 
-  // 開卡只預收，start_date 與 expire_date 留空（等第一次服務才啟用）
-  // 把 days 暫存在 plan_name 後面？不行 → 直接用獨立記法
   await sb.from('plans').insert({
     pet_id:petId, plan_type:'monthly', plan_name:name,
     total_count:count, used_count:0,
     total_points:points, used_points:0,
-    plan_days:days,                 // 期限天數，等第一次服務時用
+    plan_days:days,
     amount:amt,
-    start_date:null, expire_date:null,   // 未啟用
+    start_date:null, expire_date:null,
     is_active:true
   });
 
   await sb.from('transactions').insert({
     txn_date:today, kind:'income', txn_type:'income', in_pnl:true,
     amount:amt, account_id:acctId,
-    note:'包月預收 '+name
+    note:'包月預收 '+name+' / '+(petName||'')
   });
 
   alert('✅ 開卡成功！預收 $'+amt+'（等第一次服務啟用60/45天）');
