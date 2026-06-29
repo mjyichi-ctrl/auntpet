@@ -746,7 +746,7 @@ function renderSearch(){
     if(sort==='recent')return (b.created_at||'').localeCompare(a.created_at||'');
     if(sort==='first_old')return (a._stat.first||'9999').localeCompare(b._stat.first||'9999');
     if(sort==='last_new')return (b._stat.last||'0').localeCompare(a._stat.last||'0');
-    if(b._stat.count!==a._stat.count)return b._stat.count-a._stat.count;
+    if(b._stat.count!==a._stat.count)return a._stat.count-a._stat.count;
     return (b._stat.last||'0').localeCompare(a._stat.last||'0');
   });
   document.getElementById('searchCount').textContent=`共 ${list.length} 位`;
